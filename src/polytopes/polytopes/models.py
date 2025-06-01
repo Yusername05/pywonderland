@@ -6,13 +6,15 @@ Classes for building models of 3D/4D/5D uniform polytopes
 See the doc: "https://neozhaoliang.github.io/polytopes/"
 
 """
-from itertools import combinations
+from itertools import combinations, chain
 import numpy as np
 
+
 from . import helpers
-from .coxeter_plane import draw_on_coxeter_plane
-from .povray import export_polytope_data
 from .todd_coxeter import CosetTable
+
+#import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
 class BasePolytope:
@@ -107,6 +109,7 @@ class BasePolytope:
             self.transform(self.init_v, w) for w in self.vwords
         ])
 
+
     def get_edges(self):
         """
         Compute the indices of all edges.
@@ -179,6 +182,9 @@ class BasePolytope:
         for w in word:
             vector = np.dot(vector, self.reflections[w])
         return vector
+    
+    def geom_orbit(self, vector):
+        return [self.transform(vector, trans) for trans in self.vtable.get_words()]
 
     def move(self, vertex, word):
         """
@@ -252,11 +258,11 @@ class BasePolytope:
 
         return r"\begin{{array}}{{{}}}{}\end{{array}}".format("l" * cols, latex)
 
-    def get_povray_data(self):
-        return export_polytope_data(self)
+    # def get_povray_data(self):
+    #     return export_polytope_data(self)
 
-    def draw_on_coxeter_plane(self, *args, **kwargs):
-        draw_on_coxeter_plane(self, *args, **kwargs)
+    # def draw_on_coxeter_plane(self, *args, **kwargs):
+    #     draw_on_coxeter_plane(self, *args, **kwargs)
 
 
 class Polyhedra(BasePolytope):
@@ -264,11 +270,52 @@ class Polyhedra(BasePolytope):
     """Base class for 3d polyhedron.
     """
 
-    def __init__(self, coxeter_diagram, init_dist, extra_relations=()):
+    def __init__(self, coxeter_diagram, init_dist, axis, extra_relations=()):
         if not len(coxeter_diagram) == len(init_dist) == 3:
             raise ValueError("Length error: the inputs must all have length 3")
         super().__init__(coxeter_diagram, init_dist, extra_relations)
 
+
+class PlottingPolyhedra(Polyhedra):
+
+    """Base class for 3d polyhedron.
+    now with graphing and point exporting capabilities
+    """
+
+    def __init__(self, coxeter_diagram, init_dist, axis, extra_relations=()):
+        if not len(coxeter_diagram) == len(init_dist) == 3:
+            raise ValueError("Length error: the inputs must all have length 3")
+        super().__init__(coxeter_diagram, init_dist, extra_relations)
+        self.axis = axis
+    
+    def build_geometry(self):
+        super().build_geometry()
+        edges = list(chain.from_iterable(self.edge_indices))
+        self.edge_coords = [np.array([self.vertices_coords[u], self.vertices_coords[v]]) for u, v in edges]
+
+        faces = list(chain.from_iterable(self.face_indices))
+        self.face_coords = [np.array([self.vertices_coords[i] for i in face]) for face in faces]
+    
+    def plot_edges(self, color='gray', alpha=1):
+        for edge in self.edge_coords:
+            self.axis.plot(*edge.T, color=color, alpha = alpha)
+    
+    def plot_faces(self, facecolors='lightgrey', edgecolors='black', alpha=0.3):
+        faces = Poly3DCollection(self.face_coords, facecolors=facecolors, edgecolors=edgecolors, alpha=alpha)
+        self.axis.add_collection3d(faces)
+
+    def mid_point_coords(self, index_list):
+        return sum([self.vertices_coords[index] for index in index_list])/len(index_list)
+    
+    def plot_domain_segment(self, domain_coords, facecolors='lightgrey', edgecolors='black', alpha=0.3, linewidths=1):
+        domain_orbits_skew = np.array(list(map(self.geom_orbit, domain_coords)))
+        domain_orbits = [domain_orbits_skew[:,index] for index, _ in enumerate(domain_orbits_skew[0])]
+        domain_faces = Poly3DCollection(domain_orbits, facecolors=facecolors, edgecolors=edgecolors, alpha=alpha, linewidths=linewidths)
+        self.axis.add_collection3d(domain_faces)
+
+    def plot_vertex_labels(self):
+        for i, (x, y, z) in enumerate(self.vertices_coords):
+            self.axis.text(1.1*x, 1.1*y, 1.1*z, str(i), color='k', fontsize=12, ha='center', va='center')
 
 class Snub(Polyhedra):
 
