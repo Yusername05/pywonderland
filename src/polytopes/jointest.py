@@ -1,11 +1,7 @@
 import numpy as np
-import networkx as nx
 import matplotlib.pyplot as plt
-from itertools import chain
-
 import polytopes.models as models
 
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection="3d")
